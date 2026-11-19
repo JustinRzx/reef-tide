@@ -54,33 +54,18 @@ function TideWarning.start(): ()
 		if phase == "warning" then
 			banner.Visible = true
 			TideWarning.visible = true
+			if TideWarning.label ~= nil then
+				TideWarning.label.Text = `THE TIDE IS COMING — {math.ceil(timeLeft)}s — GET TO YOUR PAD!`
+			end
 		elseif phase == "sweep" then
 			banner.Visible = true
-			label.Text = "THE TIDE SWEEPS THE REEF!"
+			TideWarning.visible = true
+			if TideWarning.label ~= nil then
+				TideWarning.label.Text = "THE TIDE SWEEPS THE REEF!"
+			end
 		elseif phase == "calm" then
 			banner.Visible = false
 			TideWarning.visible = false
-		end
-	end)
-
-	-- live countdown while warning
-	local RunService = game:GetService("RunService")
-	RunService.RenderStepped:Connect(function()
-		if TideWarning.visible and TideWarning.label ~= nil then
-			local phase = TideWarning.banner and TideWarning.banner.Visible
-			if phase then
-				-- timeLeft arrives on events; show a shrinking hint via a local clock is
-				-- unreliable, so the label text is refreshed from the last event below
-			end
-		end
-	end)
-
-	-- refresh countdown text on each state event with the remaining seconds
-	local lastLeft = 0
-	tideState.OnClientEvent:Connect(function(phase: string, timeLeft: number)
-		lastLeft = timeLeft
-		if phase == "warning" and TideWarning.label ~= nil then
-			TideWarning.label.Text = `THE TIDE IS COMING — {math.ceil(timeLeft)}s — GET TO YOUR PAD!`
 		end
 	end)
 end

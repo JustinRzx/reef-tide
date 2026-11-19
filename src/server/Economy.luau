@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local Data = require(script.Parent.data)
+local World = require(script.Parent.World)
 
 type MutationId = Data.MutationId
 
@@ -115,6 +116,10 @@ function Economy.tryBuy(player: Player, tierIdRaw: unknown): boolean
 	if (lastBuyAt[player] or 0) + BUY_COOLDOWN > now then
 		return false
 	end
+	-- purchases happen at the fountain (design law), not from anywhere
+	if not World.nearFountain(player) then
+		return false
+	end
 	local profile = Economy.profileOf(player)
 	local ownedOfTier = 0
 	for _, o in profile.owned do
@@ -140,9 +145,6 @@ end
 function Economy.tryRebirth(player: Player): boolean
 	local profile = Economy.profileOf(player)
 	if #profile.owned < TUNING.rebirthAtOwned then
-		return false
-	end
-	if #profile.owned == 0 then
 		return false
 	end
 	profile.rebirths += 1

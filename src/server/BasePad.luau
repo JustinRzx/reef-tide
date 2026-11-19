@@ -13,6 +13,7 @@ local BasePad = {
 	ownerOfSlot = {} :: { [number]: Player },
 	slotOfPlayer = {} :: { [Player]: number },
 	collectors = {} :: { [Player]: Model },
+	lastOwnedCount = {} :: { [Player]: number },
 }
 
 local SAFE_TAG = "SafeZone"
@@ -155,6 +156,7 @@ function BasePad.release(player: Player): ()
 		BasePad.ownerOfSlot[slot] = nil
 	end
 	BasePad.slotOfPlayer[player] = nil
+	BasePad.lastOwnedCount[player] = nil
 	clearCollector(player)
 	-- reset the pad visual
 	local pad = workspace:FindFirstChild(`Pad_{player.Name}`)
@@ -226,7 +228,8 @@ function BasePad.start(): ()
 		BasePad.release(player)
 	end)
 
-	-- Falling into the water respawns the player on their own pad (no kill plane).
+	-- Falling into the water respawns the player on their own pad (no kill plane),
+	-- and the collector stack refreshes when the owned count changes (buy/rebirth/orb).
 	task.spawn(function()
 		while true do
 			task.wait(0.5)
@@ -237,6 +240,12 @@ function BasePad.start(): ()
 					if root.Position.Y < World.WATER_Y + 1 then
 						BasePad.spawnCharacter(player)
 					end
+				end
+				local profile = Economy.profileOf(player)
+				local count = #profile.owned
+				if BasePad.lastOwnedCount[player] ~= count then
+					BasePad.lastOwnedCount[player] = count
+					BasePad.refreshCollector(player)
 				end
 			end
 		end

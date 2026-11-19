@@ -152,11 +152,13 @@ function TideCycle.start(): ()
 			TideCycle.timeLeft = left
 			task.wait(1)
 		end
-		-- warning phase: klaxon
+		-- warning phase: klaxon, rebroadcast so the client countdown ticks
 		setPhase("warning", TUNING.tideWarning)
 		t0 = os.clock()
 		while os.clock() - t0 < TUNING.tideWarning do
-			TideCycle.timeLeft = TUNING.tideWarning - (os.clock() - t0)
+			local left = TUNING.tideWarning - (os.clock() - t0)
+			TideCycle.timeLeft = left
+			Economy.remotes.TideState:FireAllClients("warning", left, TUNING.tidePeriod)
 			task.wait(0.5)
 		end
 		-- sweep: animate the wall across the reef as a shrinking ring

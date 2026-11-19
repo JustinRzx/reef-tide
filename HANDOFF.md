@@ -1,19 +1,27 @@
 # HANDOFF — Meme Reef: Tide of the Weird
 
-Building `reef-tide` for make.fun roblox-brainrot-01 per BUILD_TASK.md. Nothing published; no Roblox account touched.
+Building `reef-tide` for make.fun roblox-brainrot-01 per BUILD_TASK.md. Nothing published; no Roblox account touched; no Open Cloud calls; no keys anywhere.
 
 ## Done
-- Phase 1 committed (93bab8c): `default.project.json` (DataModel "Meme Reef: Tide of the Weird", water terrain, no baseplate, bright lighting), server core:
-  - `src/server/data.luau` — 10-tier ladder with exact design-law rates/costs, 3 mutations (Shiny 1.5x / Glitched 2.5x / ROT 4x), weighted rolls, all tuning constants.
-  - `src/server/Economy.luau` — per-player profiles, validated + rate-limited `BuyBrainrot`/`Rebirth` remotes, 1 s cash tick, state broadcast.
-  - `src/server/World.luau` — dense floating reef: hub disc + underside coral, 8 ring pad slots with spokes and ring walkway, donation fountain with "make.fun REEF — the Tide is coming" banner, raiders' jetty with "make.fun REEF" start gate, 2 "Built by an AI agent for make.fun" billboards, coral towers, salvage lamps, signposts, flags, tethered balloons, drifting sky-junk, clouds, water at y=-6 (below pads). Built brainrot models + floating cash counters.
-  - `src/server/BasePad.luau` — one pad per player, safe-zone check, spawn placed ON the ground, fall-into-water respawns on own pad, collector stack per pad.
-  - `src/server/init.server.luau` entry. `rojo build` succeeded; `game.rbxl` is binary (magic verified).
+- Phase 1 (93bab8c): project + server core.
+  - `default.project.json`: DataModel "Meme Reef: Tide of the Weird", terrain water props, bright lighting, no baseplate, CharacterAutoLoads off.
+  - `src/server/data.luau`: 10-tier ladder with the design-law rates (1/s … 20,000/s) and costs, mutations Shiny 1.5x / Glitched 2.5x / ROT 4x with weighted rolls, all tuning constants (90 s tide, 10 s warning, 15 s orbs, pad radius 9, rebirth at 8, x2 per rebirth).
+  - `src/server/Economy.luau`: profiles, 1 s cash tick, floating-counter payloads; `BuyBrainrot`/`Rebirth` remotes fully validated server-side (tier id range, fountain proximity, cost, 0.25 s rate limit, owned cap) — the client's numbers are never trusted.
+  - `src/server/World.luau`: dense floating reef — hub disc + hanging coral, 8 ring pads with spokes and continuous ring walkway, donation fountain with "make.fun REEF — the Tide is coming" banner, raiders' jetty (between pads) ending at the "make.fun REEF" start gate, 2 "Built by an AI agent for make.fun" billboards, coral towers, salvage lamps, signposts, flags, tethered balloons, drifting sky-junk, clouds, buoys, rocks, sea at y=-6 below every pad. Built brainrot models (one per tier, mutation colour/particle variants) + billboard cash counters.
+  - `src/server/BasePad.luau`: one pad per player, safe-zone check, spawn placed ON the ground, fall-into-water respawns on own pad (no kill plane), collector stack refresh on owned-count change.
+- Phase 2 (a5ad89e): gameplay + client.
+  - `src/server/TideCycle.luau`: 90 s cycle, 10 s klaxon (HUD banner, ticking countdown), animated shrinking tsunami wall sweep; players caught off their own pad drop their two rarest brainrots as orbs for 15 s, grabbable by anyone within 5 studs.
+  - `src/server/Rebirth.luau`: rebirth at 8 owned keeps cash-rate multiplier, resets the base.
+  - `src/client/`: `Hud.luau` (cash top-center-right, tier ladder right edge with click-to-buy, rebirth button; all ~0.45 transparent, nothing top-left), `TideWarning.luau` (klaxon banner bottom-center), `CameraRig.luau` (real 3D scriptable follow camera, Q/E orbit), `TitleScreen.luau` (entry title screen, title well below the top edge, dismiss spawns the character), `Game.client.luau` entry.
+- Phase 3 (this commit): polish + self-review + main.ts.
+  - Density pass (buoys, rocks), jetty moved between pad slots so no walkway is blocked, warning countdown rebroadcast every 0.5 s, dead code removed, collector refresh decoupled from Economy (no circular require).
+  - Self-review of all Luau: no nil-indexing on remotes (WaitForChild), bounded loops, no decoration loops in touch handlers, RemoteEvent args validated, purchases rate-limited and fountain-checked.
+  - `main.ts` improved (behaviour kept): refuses a non-binary or stale `game.rbxl` (magic + mtime vs src/), script-coverage report (every src .luau present in the place by Rojo path), one summary line per produced file. Std-lib only, Node 22.
+  - `rojo build default.project.json --output game.rbxl` succeeds; `mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts` succeeds (12/12 scripts covered, dossier written).
 
 ## Next
-- Phase 2: `TideCycle.luau` (90 s cycle, 10 s klaxon, tsunami wall, orb drop/steal of two rarest, 15 s orbs), `Rebirth.luau`, client side: `Hud.luau` (cash, tier list, klaxon banner, all ~0.45 transparent, nothing top-left), `TideWarning.luau`, `CameraRig.luau` (real 3D camera), `TitleScreen.luau`, `Game.client.luau`. Build, commit.
-- Phase 3: polish + self-review + main.ts improvements + `node main.ts`. Commit.
+- Nothing in this session: publishing is a later human step. PLAY.json still names no place.
 
 ## Known issues
-- Collector stack caps at 10 visible models per pad (HUD lists the rest) — deliberate, to keep pads readable.
-- Tide/rebirth gameplay lands in phase 2; phase 1 is world + economy only.
+- Collector stack shows at most 10 models per pad (HUD lists all owned) — deliberate readability choice.
+- Screenshots are still the kit's starter PNGs; real captures need a running Studio session (human step).

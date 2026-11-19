@@ -19,7 +19,7 @@ local World = {
 	PAD_SLOTS = 8,
 	HUB_RADIUS = 26,
 	WATER_Y = -6,
-	JETTY_ANGLE = 0, -- radians; the jetty points along +X
+	JETTY_ANGLE = math.pi / 8, -- radians; the jetty points between two pads
 	padSlots = {} :: { Vector3 },
 	fountainTop = Vector3.new(0, 6, 0),
 	spawnPoint = Vector3.new(0, 0, 0),
@@ -442,6 +442,24 @@ function World.build(): ()
 		local a = i / 9 * math.pi * 2 + 0.5
 		local r = 70 + (i % 4) * 40
 		cloud(Vector3.new(math.cos(a) * r, 75 + (i % 5) * 8, math.sin(a) * r), 3 + (i % 3))
+	end
+
+	-- Buoys bobbing on the open water around the reef (visual only).
+	local buoyColors = { Color3.fromRGB(255, 90, 90), Color3.fromRGB(255, 220, 80), Color3.fromRGB(90, 255, 160) }
+	for i = 1, 12 do
+		local a = i / 12 * math.pi * 2 + 0.25
+		local r = 70 + (i % 4) * 22
+		local p = Vector3.new(math.cos(a) * r, World.WATER_Y + 0.4, math.sin(a) * r)
+		sphere(`Buoy{i}`, 1.1, CFrame.new(p.X, p.Y, p.Z), buoyColors[(i % #buoyColors) + 1]!, Enum.Material.Neon).Parent = workspace
+	end
+
+	-- Scattered rocks on the hub for texture.
+	for i = 1, 16 do
+		local a = i / 16 * math.pi * 2 + 0.15
+		local r = World.HUB_RADIUS - 4 + (i % 3) * 2
+		local p = Vector3.new(math.cos(a) * r, top - 2, math.sin(a) * r)
+		local rock = part(`Rock{i}`, Vector3.new(1 + (i % 3), 0.8 + (i % 2) * 0.6, 1 + (i % 4) * 0.4), CFrame.new(p.X, p.Y + 0.4, p.Z) * CFrame.Angles(0, i, 0), Color3.fromRGB(150, 130, 110), Enum.Material.Rock)
+		rock.Parent = workspace
 	end
 
 	-- Sky-junk drifts slowly (a small bounded loop, not per-frame decoration inside a touch handler).
