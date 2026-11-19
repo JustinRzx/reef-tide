@@ -1,10 +1,11 @@
 {
-  "name": "house-dodge",
+  "name": "Meme Reef: Tide of the Weird",
   "tree": {
     "$className": "DataModel",
     "Players": {
       "$properties": {
-        "CharacterAutoLoads": false
+        "CharacterAutoLoads": false,
+        "RespawnTime": 3
       }
     },
     "ServerScriptService": {
@@ -21,42 +22,36 @@
     },
     "Workspace": {
       "$properties": {
-        "FilteringEnabled": true
+        "FilteringEnabled": true,
+        "Gravity": 60
       },
-      "Baseplate": {
-        "$className": "Part",
+      "Terrain": {
+        "$className": "Terrain",
         "$properties": {
-          "Anchored": true,
-          "Color": [
-            0.38823,
-            0.37254,
-            0.38823
-          ],
-          "Locked": true,
-          "Position": [
-            0,
-            -10,
-            0
-          ],
-          "Size": [
-            512,
-            20,
-            512
-          ]
+          "WaterColor": [0.36, 0.85, 0.92],
+          "WaterTransparency": 0.35,
+          "WaterWaveSize": 1.2,
+          "WaterWaveSpeed": 14
         }
       }
     },
     "Lighting": {
       "$properties": {
-        "Ambient": [
-          0,
-          0,
-          0
-        ],
-        "Brightness": 2,
+        "Ambient": [0.55, 0.62, 0.68],
+        "Brightness": 3,
         "GlobalShadows": true,
         "Outlines": false,
-        "Technology": "Voxel"
+        "Technology": "ShadowMap",
+        "ColorShift_Top": [1, 0.98, 0.9],
+        "ColorShift_Bottom": [0.75, 0.85, 0.95],
+        "ClockTime": 10.5,
+        "GeographicLatitude": 18
+      }
+    },
+    "ReplicatedStorage": {
+      "$properties": {},
+      "Remotes": {
+        "$className": "Folder"
       }
     },
     "SoundService": {
