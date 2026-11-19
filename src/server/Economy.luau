@@ -202,19 +202,21 @@ function Economy.start(): ()
 
 	-- Cash ticks once per second per player; the client also gets a tick payload
 	-- so its floating counter can animate smoothly.
-	while true do
-		local dt = task.wait(TUNING.cashTick)
-		for _, player in Players:GetPlayers() do
-			local profile = Economy.profiles[player]
-			if profile ~= nil then
-				local rate = Economy.rateOf(profile)
-				if rate > 0 then
-					Economy.addCash(profile, rate * dt)
+	task.spawn(function()
+		while true do
+			local dt = task.wait(TUNING.cashTick)
+			for _, player in Players:GetPlayers() do
+				local profile = Economy.profiles[player]
+				if profile ~= nil then
+					local rate = Economy.rateOf(profile)
+					if rate > 0 then
+						Economy.addCash(profile, rate * dt)
+					end
+					Economy.remotes.CashTick:FireClient(player, profile.cash, rate)
 				end
-				Economy.remotes.CashTick:FireClient(player, profile.cash, rate)
 			end
 		end
-	end
+	end)
 end
 
 return Economy

@@ -5,9 +5,13 @@
 local World = require(script.World)
 local BasePad = require(script.BasePad)
 local Economy = require(script.Economy)
+local TideCycle = require(script.TideCycle)
+local Rebirth = require(script.Rebirth)
 
 World.build()
 BasePad.start()
 Economy.start()
+TideCycle.start()
+Rebirth.start()
 
 print("[Meme Reef] server started: reef built, pads assigned, economy ticking")

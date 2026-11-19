@@ -227,18 +227,20 @@ function BasePad.start(): ()
 	end)
 
 	-- Falling into the water respawns the player on their own pad (no kill plane).
-	while true do
-		task.wait(0.5)
-		for _, player in Players:GetPlayers() do
-			local char = player.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			if root ~= nil and root:IsA("BasePart") then
-				if root.Position.Y < World.WATER_Y + 1 then
-					BasePad.spawnCharacter(player)
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			for _, player in Players:GetPlayers() do
+				local char = player.Character
+				local root = char and char:FindFirstChild("HumanoidRootPart")
+				if root ~= nil and root:IsA("BasePart") then
+					if root.Position.Y < World.WATER_Y + 1 then
+						BasePad.spawnCharacter(player)
+					end
 				end
 			end
 		end
-	end
+	end)
 end
 
 return BasePad
