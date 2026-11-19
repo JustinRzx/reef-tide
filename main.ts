@@ -9,8 +9,9 @@
 //
 // On top of the starter behaviour it checks what it hands in before writing anything: game.rbxl must be a
 // binary place (magic `<roblox!`) and newer than every file under src/ (a stale build fails loudly), and every
-// .luau/.lua under src/ must appear as a script of the built place by name (script-coverage report). Each
-// produced file gets one readable summary line.
+// .luau/.lua under src/ must appear as a script of the built place by name (script-coverage report) and, byte
+// for byte after source normalisation, equal some script's source (source-coverage report). Each produced
+// file gets one readable summary line.
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
@@ -18,7 +19,7 @@
 import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildDossier, readPlace, rojoPath } from './vendor/makefun-roblox.ts';
+import { buildDossier, matchSources, readPlace, rojoPath } from './vendor/makefun-roblox.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
@@ -69,9 +70,17 @@ const missing = srcFiles.filter((p) => {
 if (missing.length > 0) {
   throw new Error(`script coverage: ${missing.length} of ${srcFiles.length} src/ files are not scripts of game.rbxl (${missing.join(', ')})`);
 }
+// Byte-level coverage: each src file's normalised bytes must equal a script's source in
+// the place, so a place that merely carries the right names is not enough.
+const srcSources = srcFiles.map((p) => ({ path: p, bytes: new Uint8Array(readFileSync(join(here, 'src', p))) }));
+const match = matchSources(place, srcSources);
+if (match.unmatched.length > 0) {
+  throw new Error(`source coverage: ${match.unmatched.length} of ${srcFiles.length} src/ files differ from every script of game.rbxl (${match.unmatched.join(', ')})`);
+}
 const scriptBytes = place.scripts.reduce((n, s) => n + (s.source?.length ?? 0), 0);
 console.log(`game.rbxl: binary place, ${place.instances} instances, ${place.scripts.length} scripts (${scriptBytes} bytes of source), built ${new Date(gameMtime).toISOString()}`);
 console.log(`script coverage: ${srcFiles.length}/${srcFiles.length} src/ .luau files present in the place by name`);
+console.log(`source coverage: ${(match.coverage * 100).toFixed(1)}% of script bytes byte-identical to a src/ file (${match.matched.length}/${srcFiles.length} files matched)`);
 
 // --- hand in -----------------------------------------------------------------------------
 

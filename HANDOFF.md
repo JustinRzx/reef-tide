@@ -13,11 +13,17 @@ Building `reef-tide` for make.fun roblox-brainrot-01 per BUILD_TASK.md. Nothing 
   - `src/server/TideCycle.luau`: 90 s cycle, 10 s klaxon (HUD banner, ticking countdown), animated shrinking tsunami wall sweep; players caught off their own pad drop their two rarest brainrots as orbs for 15 s, grabbable by anyone within 5 studs.
   - `src/server/Rebirth.luau`: rebirth at 8 owned keeps cash-rate multiplier, resets the base.
   - `src/client/`: `Hud.luau` (cash top-center-right, tier ladder right edge with click-to-buy, rebirth button; all ~0.45 transparent, nothing top-left), `TideWarning.luau` (klaxon banner bottom-center), `CameraRig.luau` (real 3D scriptable follow camera, Q/E orbit), `TitleScreen.luau` (entry title screen, title well below the top edge, dismiss spawns the character), `Game.client.luau` entry.
-- Phase 3 (this commit): polish + self-review + main.ts.
+- Phase 3 (7c4ad29): polish + self-review + main.ts.
   - Density pass (buoys, rocks), jetty moved between pad slots so no walkway is blocked, warning countdown rebroadcast every 0.5 s, dead code removed, collector refresh decoupled from Economy (no circular require).
   - Self-review of all Luau: no nil-indexing on remotes (WaitForChild), bounded loops, no decoration loops in touch handlers, RemoteEvent args validated, purchases rate-limited and fountain-checked.
   - `main.ts` improved (behaviour kept): refuses a non-binary or stale `game.rbxl` (magic + mtime vs src/), script-coverage report (every src .luau present in the place by Rojo path), one summary line per produced file. Std-lib only, Node 22.
   - `rojo build default.project.json --output game.rbxl` succeeds; `mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts` succeeds (12/12 scripts covered, dossier written).
+- Phase 4 (this commit): fresh verification + fix pass.
+  - Re-ran `rojo build` and `node main.ts` clean, then self-reviewed every `src/*.luau` against the build-quality lessons.
+  - Fixes: spokes/ring walkway/jetty beams now sit with their top flush at WALK_TOP via a `deck()` helper, so hub, pads and walkways are one continuous walkable surface (they were 2 studs proud); added a `GateDeck` platform under the start gate and clamped `World.spawnPoint` to the deck top, so the entry spawn rests on the ground instead of over open water past the jetty end; re-indented the mis-nested `sweep()` body and tide loop in `TideCycle.luau`.
+  - Confirmed clean on re-review: spawn placed ON the ground (pad top + 1 stud, drops in), no decoration loops in any touch handler (orb pickup is a bounded Heartbeat distance check; there are no Touched handlers), all RemoteEvent args validated server-side (tier range, fountain proximity, cost, 0.25 s rate limit, owned caps), HUD has nothing in the top-left and the title sits at 0.32 of the screen, water at y=-6 below every pad with fall-respawn on the own pad (no kill plane).
+  - `main.ts` revised again (behaviour kept): adds a byte-level source-coverage report via the kit's `matchSources` — every src file's normalised bytes must equal a script's source in the place, not just match by name; fails loudly on any unmatched file. Std-lib only, Node 22.
+  - `rojo build` succeeds; `MAKEFUN_OUTPUT_DIR=out node main.ts` succeeds: 12/12 scripts by name, 100.0% of script bytes byte-identical to a src/ file, dossier written.
 
 ## Next
 - Nothing in this session: publishing is a later human step. PLAY.json still names no place.

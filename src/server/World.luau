@@ -66,6 +66,13 @@ local function beam(name: string, a: Vector3, b: Vector3, thickness: number, col
 	return part(name, Vector3.new(thickness, thickness, dist), cf, color, material)
 end
 
+-- A walkable deck beam from a to b whose top surface sits exactly at WALK_TOP, so the
+-- hub, spokes, ring walkway, pads and jetty form one continuous flat surface.
+local function deck(name: string, a: Vector3, b: Vector3, width: number, color: Color3): Part
+	local y = World.WALK_TOP - width / 2
+	return beam(name, Vector3.new(a.X, y, a.Z), Vector3.new(b.X, y, b.Z), width, color, Enum.Material.WoodPlanks)
+end
+
 local function flatCFrame(center: Vector3, sizeY: number): CFrame
 	return CFrame.new(center.X, center.Y - sizeY / 2, center.Z)
 end
@@ -317,11 +324,11 @@ function World.build(): ()
 		local pad = part(`PadSlot{i}`, Data.TUNING.padSize, CFrame.new(pos.X, pos.Y, pos.Z), Color3.fromRGB(120, 120, 130), Enum.Material.Concrete)
 		pad.Parent = workspace
 		CollectionService:AddTag(pad, "PadSlot")
-		-- spoke walkway from hub to pad
-		local spokeStart = Vector3.new(math.cos((i - 1) / slotCount * math.pi * 2) * (World.HUB_RADIUS - 2), top - 1, math.sin((i - 1) / slotCount * math.pi * 2) * (World.HUB_RADIUS - 2))
-		beam(`Spoke{i}`, spokeStart, pos + Vector3.new(0, 0, 0), 6, Color3.fromRGB(210, 190, 150), Enum.Material.WoodPlanks).Parent = workspace
+		-- spoke walkway from hub to pad (deck top flush with the hub top)
+		local spokeStart = Vector3.new(math.cos((i - 1) / slotCount * math.pi * 2) * (World.HUB_RADIUS - 2), top, math.sin((i - 1) / slotCount * math.pi * 2) * (World.HUB_RADIUS - 2))
+		deck(`Spoke{i}`, spokeStart, pos, 6, Color3.fromRGB(210, 190, 150)).Parent = workspace
 		-- ring walkway chord between adjacent pads
-		beam(`RingWalk{i}`, pos, nextPos, 6, Color3.fromRGB(210, 190, 150), Enum.Material.WoodPlanks).Parent = workspace
+		deck(`RingWalk{i}`, pos, nextPos, 6, Color3.fromRGB(210, 190, 150)).Parent = workspace
 	end
 
 	-- Central donation fountain (the shop).
@@ -356,7 +363,7 @@ function World.build(): ()
 	local jettyStart = jettyDir * (World.RING_RADIUS - 4) + Vector3.new(0, top - 1, 0)
 	local jettyEnd = jettyDir * (World.RING_RADIUS + Data.TUNING.jettyLength) + Vector3.new(0, top - 1, 0)
 	World.jettyEnd = jettyEnd + Vector3.new(0, 1, 0)
-	beam("Jetty", jettyStart, jettyEnd, 7, Color3.fromRGB(150, 110, 70), Enum.Material.WoodPlanks).Parent = workspace
+	deck("Jetty", jettyStart, jettyEnd, 7, Color3.fromRGB(150, 110, 70)).Parent = workspace
 	for i = 1, 6 do
 		local t = i / 7
 		local p = jettyStart + (jettyEnd - jettyStart) * t
@@ -364,6 +371,9 @@ function World.build(): ()
 	end
 	-- start gate arch at the jetty end (spawn stands under it)
 	local gatePos = jettyEnd + jettyDir * 4
+	-- a small platform under the gate so the entry spawn is ON the ground, over the jetty
+	-- deck extended to the gate, never over open water
+	deck("GateDeck", jettyEnd, gatePos, 7, Color3.fromRGB(150, 110, 70)).Parent = workspace
 	beam("GatePillarL", gatePos + Vector3.new(0, 0, -4), gatePos + Vector3.new(0, 9, -4), 0.9, Color3.fromRGB(255, 200, 60), Enum.Material.Neon).Parent = workspace
 	beam("GatePillarR", gatePos + Vector3.new(0, 0, 4), gatePos + Vector3.new(0, 9, 4), 0.9, Color3.fromRGB(255, 200, 60), Enum.Material.Neon).Parent = workspace
 	local gateBeam = beam("GateBeam", gatePos + Vector3.new(0, 9, -4), gatePos + Vector3.new(0, 9, 4), 0.9, Color3.fromRGB(255, 200, 60), Enum.Material.Neon)
@@ -372,6 +382,8 @@ function World.build(): ()
 	gateSign.Parent = workspace
 	signText(gateSign, "make.fun REEF", 90, Color3.fromRGB(140, 255, 220), Enum.NormalId.Front)
 	World.spawnPoint = gatePos + Vector3.new(0, top, 0) - jettyDir * 1
+	-- the spawn must rest on the gate deck, not float: clamp to the deck top
+	World.spawnPoint = Vector3.new(World.spawnPoint.X, top, World.spawnPoint.Z)
 
 	-- Two billboards.
 	local billboardTexts = { "Built by an AI agent for make.fun", "Built by an AI agent for make.fun" }

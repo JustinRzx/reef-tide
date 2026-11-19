@@ -81,26 +81,26 @@ local function sweep(): ()
 	for _, player in Players:GetPlayers() do
 		local profile = Economy.profileOf(player)
 		if #profile.owned >= 1 and not BasePad.isOnOwnPad(player) then
-				local char = player.Character
-				local root = char and char:FindFirstChild("HumanoidRootPart")
-				local at = if root ~= nil and root:IsA("BasePart") then root.Position else World.spawnPoint
-				local rarest = twoRarest(profile)
-				for _, o in rarest do
-					if o == nil then
-						continue
-					end
-					spawnOrb(player, o, at)
-					-- remove that owned entry
-					for i, owned in profile.owned do
-						if owned.tier == o.tier and owned.mutation == o.mutation then
-							table.remove(profile.owned, i)
-							break
-						end
+			local char = player.Character
+			local root = char and char:FindFirstChild("HumanoidRootPart")
+			local at = if root ~= nil and root:IsA("BasePart") then root.Position else World.spawnPoint
+			local rarest = twoRarest(profile)
+			for _, o in rarest do
+				if o == nil then
+					continue
+				end
+				spawnOrb(player, o, at)
+				-- remove that owned entry
+				for i, owned in profile.owned do
+					if owned.tier == o.tier and owned.mutation == o.mutation then
+						table.remove(profile.owned, i)
+						break
 					end
 				end
-				Economy.broadcastState(player)
-				BasePad.refreshCollector(player)
 			end
+			Economy.broadcastState(player)
+			BasePad.refreshCollector(player)
+		end
 		end
 	end
 end
@@ -144,41 +144,41 @@ function TideCycle.start(): ()
 	startOrbTouch()
 	task.spawn(function()
 		while true do
-		-- calm phase
-		setPhase("calm", TUNING.tidePeriod)
-		local t0 = os.clock()
-		while os.clock() - t0 < TUNING.tidePeriod - TUNING.tideWarning do
-			local left = TUNING.tidePeriod - (os.clock() - t0)
-			TideCycle.timeLeft = left
-			task.wait(1)
-		end
-		-- warning phase: klaxon, rebroadcast so the client countdown ticks
-		setPhase("warning", TUNING.tideWarning)
-		t0 = os.clock()
-		while os.clock() - t0 < TUNING.tideWarning do
-			local left = TUNING.tideWarning - (os.clock() - t0)
-			TideCycle.timeLeft = left
-			Economy.remotes.TideState:FireAllClients("warning", left, TUNING.tidePeriod)
-			task.wait(0.5)
-		end
-		-- sweep: animate the wall across the reef as a shrinking ring
-		setPhase("sweep", 0)
-		local radius = 140
-		local wall = TideCycle.wall
-		if wall ~= nil then
-			wall.Shape = Enum.PartType.Cylinder
-			wall.Size = Vector3.new(radius * 2, 30, radius * 2)
-			wall.CFrame = CFrame.new(0, World.WATER_Y + 12, 0)
-			for step = 1, 30 do
-				local r = radius * (1 - step / 30)
-				wall.Size = Vector3.new(r * 2, 30, r * 2)
-				wall.CFrame = CFrame.new(0, World.WATER_Y + 12, 0)
-				task.wait(0.12)
+			-- calm phase
+			setPhase("calm", TUNING.tidePeriod)
+			local t0 = os.clock()
+			while os.clock() - t0 < TUNING.tidePeriod - TUNING.tideWarning do
+				local left = TUNING.tidePeriod - (os.clock() - t0)
+				TideCycle.timeLeft = left
+				task.wait(1)
 			end
-			wall:Destroy()
-			TideCycle.wall = makeWall()
-		end
-		sweep()
+			-- warning phase: klaxon, rebroadcast so the client countdown ticks
+			setPhase("warning", TUNING.tideWarning)
+			t0 = os.clock()
+			while os.clock() - t0 < TUNING.tideWarning do
+				local left = TUNING.tideWarning - (os.clock() - t0)
+				TideCycle.timeLeft = left
+				Economy.remotes.TideState:FireAllClients("warning", left, TUNING.tidePeriod)
+				task.wait(0.5)
+			end
+			-- sweep: animate the wall across the reef as a shrinking ring
+			setPhase("sweep", 0)
+			local radius = 140
+			local wall = TideCycle.wall
+			if wall ~= nil then
+				wall.Shape = Enum.PartType.Cylinder
+				wall.Size = Vector3.new(radius * 2, 30, radius * 2)
+				wall.CFrame = CFrame.new(0, World.WATER_Y + 12, 0)
+				for step = 1, 30 do
+					local r = radius * (1 - step / 30)
+					wall.Size = Vector3.new(r * 2, 30, r * 2)
+					wall.CFrame = CFrame.new(0, World.WATER_Y + 12, 0)
+					task.wait(0.12)
+				end
+				wall:Destroy()
+				TideCycle.wall = makeWall()
+			end
+			sweep()
 		end
 	end)
 end
