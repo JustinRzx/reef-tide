@@ -4,7 +4,6 @@
 -- start gate, coral towers, salvage lamps, signposts, flags, tethered balloons,
 -- drifting sky-junk, clouds, water and seabed. Also builds the brainrot models.
 
-local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
 local Data = require(script.Parent.data)
@@ -283,6 +282,8 @@ local function skyJunkPiece(pos: Vector3, size: Vector3, color: Color3, seed: nu
 	model.Name = "SkyJunk"
 	local p = part("Junk", size, CFrame.new(pos.X, pos.Y, pos.Z) * CFrame.Angles(seed, seed * 2, seed * 0.5), color, Enum.Material.Metal)
 	p.Parent = model
+	-- the drift loop moves the model with GetPivot/PivotTo every frame, which needs a PrimaryPart
+	model.PrimaryPart = p
 	if seed % 3 == 0 then
 		sphere("JunkBit", size.X * 0.3, CFrame.new(0, size.Y * 0.8, 0), Color3.fromRGB(255, 200, 80), Enum.Material.Neon).Parent = model
 	end
@@ -323,7 +324,6 @@ function World.build(): ()
 		-- pad platform (BasePad recolors/activates it per player)
 		local pad = part(`PadSlot{i}`, Data.TUNING.padSize, CFrame.new(pos.X, pos.Y, pos.Z), Color3.fromRGB(120, 120, 130), Enum.Material.Concrete)
 		pad.Parent = workspace
-		CollectionService:AddTag(pad, "PadSlot")
 		-- spoke walkway from hub to pad (deck top flush with the hub top)
 		local spokeStart = Vector3.new(math.cos((i - 1) / slotCount * math.pi * 2) * (World.HUB_RADIUS - 2), top, math.sin((i - 1) / slotCount * math.pi * 2) * (World.HUB_RADIUS - 2))
 		deck(`Spoke{i}`, spokeStart, pos, 6, Color3.fromRGB(210, 190, 150)).Parent = workspace
@@ -346,7 +346,6 @@ function World.build(): ()
 	sphere("FountainTop", 1, CFrame.new(0, top + 7.2, 0), Color3.fromRGB(160, 240, 255), Enum.Material.Neon).Parent = fountain
 	fountain.Parent = workspace
 	World.fountainTop = Vector3.new(0, top + 7.5, 0)
-	CollectionService:AddTag(fountain, "Fountain")
 
 	-- The banner over the fountain.
 	local bannerY = top + 12
@@ -491,7 +490,12 @@ function World.nearFountain(player: Player): boolean
 	if root == nil or not root:IsA("BasePart") then
 		return false
 	end
-	return (root.Position - World.fountainTop).Magnitude <= Data.TUNING.fountainBuyRadius + 6
+	-- horizontal 2D distance only (ignore Y): fountainTop sits ~7.5 studs above
+	-- the ground, so a loose 3D check would widen the effective buy radius well
+	-- past the design radius and let players buy from the hub edge
+	local dx = root.Position.X - World.fountainTop.X
+	local dz = root.Position.Z - World.fountainTop.Z
+	return math.hypot(dx, dz) <= Data.TUNING.fountainBuyRadius
 end
 
 function World.padSlotPosition(slot: number): Vector3

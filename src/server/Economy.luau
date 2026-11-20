@@ -75,6 +75,17 @@ function Economy.ownedCount(profile: Profile): number
 	return #profile.owned
 end
 
+-- How many copies of one tier the profile currently owns (drives costOf pricing).
+local function ownedOfTier(profile: Profile, tierId: number): number
+	local n = 0
+	for _, o in profile.owned do
+		if o.tier == tierId then
+			n += 1
+		end
+	end
+	return n
+end
+
 -- Income per second across every owned brainrot (tier rate * mutation * rebirth multiplier).
 function Economy.rateOf(profile: Profile): number
 	local sum = 0
@@ -121,16 +132,11 @@ function Economy.tryBuy(player: Player, tierIdRaw: unknown): boolean
 		return false
 	end
 	local profile = Economy.profileOf(player)
-	local ownedOfTier = 0
-	for _, o in profile.owned do
-		if o.tier == tierId then
-			ownedOfTier += 1
-		end
-	end
-	if ownedOfTier >= TUNING.maxOwnedPerTier then
+	local ownedCount = ownedOfTier(profile, tierId)
+	if ownedCount >= TUNING.maxOwnedPerTier then
 		return false
 	end
-	local cost = Data.costOf(tierId, ownedOfTier)
+	local cost = Data.costOf(tierId, ownedCount)
 	if profile.cash < cost then
 		return false
 	end
@@ -161,10 +167,17 @@ function Economy.serialize(profile: Profile): { any }
 	for i, o in profile.owned do
 		owned[i] = { tier = o.tier, mutation = o.mutation }
 	end
+	-- The ACTUAL current price per tier (costOf = base * 1.6^owned), so the client
+	-- HUD can show what a buy would really cost right now, not the base prices.
+	local prices: { number } = {}
+	for tierId = 1, Data.MAX_TIER do
+		prices[tierId] = Data.costOf(tierId, ownedOfTier(profile, tierId))
+	end
 	return {
 		cash = profile.cash,
 		rate = Economy.rateOf(profile),
 		owned = owned,
+		prices = prices,
 		rebirths = profile.rebirths,
 		cashMultiplier = profile.cashMultiplier,
 		totalEarned = profile.totalEarned,
@@ -174,12 +187,6 @@ end
 function Economy.broadcastState(player: Player): ()
 	local profile = Economy.profileOf(player)
 	Economy.remotes.State:FireClient(player, Economy.serialize(profile))
-end
-
-function Economy.broadcastAll(): ()
-	for _, player in Players:GetPlayers() do
-		Economy.broadcastState(player)
-	end
 end
 
 function Economy.start(): ()

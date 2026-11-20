@@ -84,11 +84,19 @@ function TitleScreen.start(onDismiss: () -> ()): ()
 	button.Text = "DIVE IN"
 	button.Parent = backdrop
 
+	local inputConn: RBXScriptConnection? = nil
+
 	local function dismiss()
 		if TitleScreen.dismissed then
 			return
 		end
 		TitleScreen.dismissed = true
+		-- disconnect the input handler too, not just destroy the gui, so the
+		-- connection and its closure do not stay alive on every input forever
+		if inputConn ~= nil then
+			inputConn:Disconnect()
+			inputConn = nil
+		end
 		gui:Destroy()
 		if TitleScreen.onDismiss ~= nil then
 			TitleScreen.onDismiss()
@@ -96,7 +104,7 @@ function TitleScreen.start(onDismiss: () -> ()): ()
 	end
 
 	button.MouseButton1Click:Connect(dismiss)
-	UserInputService.InputBegan:Connect(function(input, processed)
+	inputConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
 			return
 		end

@@ -13,10 +13,17 @@ local BasePad = {
 	ownerOfSlot = {} :: { [number]: Player },
 	slotOfPlayer = {} :: { [Player]: number },
 	collectors = {} :: { [Player]: Model },
+	padDecor = {} :: { [Player]: { sign: BasePart?, zone: BasePart? } },
 	lastOwnedCount = {} :: { [Player]: number },
+	-- debounce bookkeeping for the collector rebuild: lastOwnedChangeAt is when
+	-- the owned count last changed, collectorOwnedCount is what the stack shows
+	lastOwnedChangeAt = {} :: { [Player]: number },
+	collectorOwnedCount = {} :: { [Player]: number },
 }
 
-local SAFE_TAG = "SafeZone"
+-- Rebuild the collector stack only after the owned count has been quiet for at
+-- least this long, so rapid purchases do not churn part creation.
+local COLLECT_DEBOUNCE = 0.5
 
 local function padCFrame(slot: number): CFrame
 	local pos = World.padSlotPosition(slot)
@@ -26,6 +33,7 @@ end
 local function stylePad(slot: number, player: Player): ()
 	local pad = workspace:FindFirstChild(`PadSlot{slot}`)
 	if pad == nil or not pad:IsA("Part") then
+		BasePad.padDecor[player] = nil
 		return
 	end
 	pad.Color = Color3.fromRGB(80, 200, 170)
@@ -59,14 +67,18 @@ local function stylePad(slot: number, player: Player): ()
 
 	-- invisible safe-zone cylinder above the pad
 	local zone = Instance.new("Part")
-	zone.Name = SAFE_TAG
+	zone.Name = "SafeZone"
 	zone.Anchored = true
 	zone.CanCollide = false
 	zone.Transparency = 1
 	zone.Shape = Enum.PartType.Cylinder
 	zone.Size = Vector3.new(24, Data.TUNING.padRadius * 2, Data.TUNING.padRadius * 2)
-	zone.CFrame = padCFrame(slot) * CFrame.new(0, Data.TUNING.padRadius, 0) * CFrame.Angles(0, 0, math.pi / 2)
+	-- no Z rotation: the cylinder axis must stay vertical above the pad
+	zone.CFrame = padCFrame(slot) * CFrame.new(0, Data.TUNING.padRadius, 0)
 	zone.Parent = workspace
+
+	-- remember the decor per player so release() can Destroy it (no instance leak)
+	BasePad.padDecor[player] = { sign = sign, zone = zone }
 end
 
 local function clearCollector(player: Player): ()
@@ -81,6 +93,8 @@ end
 function BasePad.refreshCollector(player: Player): ()
 	clearCollector(player)
 	local profile = Economy.profileOf(player)
+	-- remember which owned count this stack reflects (debounce bookkeeping)
+	BasePad.collectorOwnedCount[player] = #profile.owned
 	if #profile.owned == 0 then
 		return
 	end
@@ -129,7 +143,7 @@ function BasePad.assign(player: Player): ()
 	if BasePad.slotOfPlayer[player] ~= nil then
 		return
 	end
-	-- first free slot, else round-robin
+	-- first free slot
 	local slot: number? = nil
 	for i = 1, World.PAD_SLOTS do
 		if BasePad.ownerOfSlot[i] == nil then
@@ -138,7 +152,10 @@ function BasePad.assign(player: Player): ()
 		end
 	end
 	if slot == nil then
-		slot = ((#Players:GetPlayers() - 1) % World.PAD_SLOTS) + 1
+		-- every pad is already owned (more players than PAD_SLOTS): never overwrite
+		-- an owned slot — leave the player without a pad; spawnCharacter already
+		-- handles a nil slot by spawning at the gate
+		return
 	end
 	BasePad.slotOfSlotFix(slot, player)
 	stylePad(slot, player)
@@ -151,12 +168,25 @@ function BasePad.slotOfSlotFix(slot: number, player: Player): ()
 end
 
 function BasePad.release(player: Player): ()
+	-- destroy the pad decor (name sign + safe zone) so it does not leak
+	local decor = BasePad.padDecor[player]
+	if decor ~= nil then
+		if decor.sign ~= nil then
+			decor.sign:Destroy()
+		end
+		if decor.zone ~= nil then
+			decor.zone:Destroy()
+		end
+		BasePad.padDecor[player] = nil
+	end
 	local slot = BasePad.slotOfPlayer[player]
 	if slot ~= nil then
 		BasePad.ownerOfSlot[slot] = nil
 	end
 	BasePad.slotOfPlayer[player] = nil
 	BasePad.lastOwnedCount[player] = nil
+	BasePad.lastOwnedChangeAt[player] = nil
+	BasePad.collectorOwnedCount[player] = nil
 	clearCollector(player)
 	-- reset the pad visual
 	local pad = workspace:FindFirstChild(`Pad_{player.Name}`)
@@ -222,9 +252,13 @@ function BasePad.start(): ()
 		-- and without this the player joins with no character at all.
 		player:LoadCharacter()
 		player.CharacterAdded:Connect(function(char)
+			-- on the first frame after CharacterAdded these children may not exist
+			-- yet; wait for them so spawn positioning and the Died hook always
+			-- apply instead of silently skipping the player
+			char:WaitForChild("HumanoidRootPart")
+			local humanoid = char:WaitForChild("Humanoid")
 			BasePad.spawnCharacter(player)
-			local humanoid = char:FindFirstChild("Humanoid")
-			if humanoid ~= nil and humanoid:IsA("Humanoid") then
+			if humanoid:IsA("Humanoid") then
 				humanoid.Died:Connect(function()
 					-- auto-respawn is off with CharacterAutoLoads=false: reload server-side
 					task.wait(Players.RespawnTime)
@@ -266,6 +300,12 @@ function BasePad.start(): ()
 				local count = #profile.owned
 				if BasePad.lastOwnedCount[player] ~= count then
 					BasePad.lastOwnedCount[player] = count
+					BasePad.lastOwnedChangeAt[player] = os.clock()
+				end
+				-- debounce: rebuild only once the owned count has been stable for
+				-- COLLECT_DEBOUNCE, so fast purchases do not churn ~80-part rebuilds
+				if BasePad.collectorOwnedCount[player] ~= count
+					and os.clock() - (BasePad.lastOwnedChangeAt[player] or 0) >= COLLECT_DEBOUNCE then
 					BasePad.refreshCollector(player)
 				end
 			end

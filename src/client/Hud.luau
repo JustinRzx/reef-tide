@@ -13,16 +13,31 @@ local Hud = {
 	gui = nil :: ScreenGui?,
 	cashLabel = nil :: TextLabel?,
 	tierList = nil :: Frame?,
+	tierRows = {} :: { [number]: { row: TextButton, index: number, tier: { any } } },
 	ownedLabel = nil :: TextLabel?,
 	rebirthLabel = nil :: TextLabel?,
+	notifyLabel = nil :: TextLabel?,
 	state = nil :: { any }?,
 }
 
+-- WaitForChild with a timeout returns nil when the server has not created the
+-- child yet (slow start); loop-retry instead of indexing a possible nil.
+local function waitForChild(parent: Instance, name: string): Instance
+	while true do
+		local child: Instance? = parent:WaitForChild(name, 10)
+		if child ~= nil then
+			return child
+		end
+	end
+end
+
 local function remotes(): { [string]: RemoteEvent }
-	local folder = ReplicatedStorage:WaitForChild("Remotes", 10)
+	local folder = waitForChild(ReplicatedStorage, "Remotes")
 	local out: { [string]: RemoteEvent } = {}
 	for _, name in { "BuyBrainrot", "Rebirth", "State", "CashTick", "TideState", "OrbTaken" } do
-		out[name] = folder:WaitForChild(name, 10) :: RemoteEvent
+		local r = waitForChild(folder, name)
+		assert(r:IsA("RemoteEvent"), `Remotes.{name} is not a RemoteEvent`)
+		out[name] = r :: RemoteEvent
 	end
 	return out
 end
@@ -37,6 +52,21 @@ local function makeLabel(parent: Instance, name: string): TextLabel
 	label.TextScaled = true
 	label.Parent = parent
 	return label
+end
+
+-- Row text for the ladder: name + rate + the ACTUAL current price from the last State
+-- payload (the server's costOf = base * 1.6^owned). Only before the first State
+-- arrives does it fall back to the shared base cost.
+local function tierText(index: number, tier: { any }): string
+	local price = tier.cost
+	local state = Hud.state
+	if state ~= nil and typeof(state.prices) == "table" then
+		local p = state.prices[tier.id]
+		if typeof(p) == "number" then
+			price = p
+		end
+	end
+	return `{index}. {tier.name}  —  {tier.rate}/s  —  ${price}`
 end
 
 -- The 10-tier ladder list on the right edge, click-to-buy at the fountain.
@@ -71,8 +101,9 @@ function Hud.buildTierList(container: Frame, data: { any }): ()
 		row.TextColor3 = Color3.fromRGB(235, 250, 255)
 		row.TextSize = 14
 		row.TextXAlignment = Enum.TextXAlignment.Left
-		row.Text = `{i}. {tier.name}  —  {tier.rate}/s  —  ${tier.cost}`
+		row.Text = tierText(i, tier)
 		row.Parent = list
+		Hud.tierRows[tier.id] = { row = row, index = i, tier = tier }
 		row.MouseButton1Click:Connect(function()
 			local r = remotes()
 			r.BuyBrainrot:FireServer(tier.id)
@@ -145,6 +176,17 @@ function Hud.start(data: { any }): ()
 		remotes().Rebirth:FireServer()
 	end)
 
+	-- Notification line (orb pickups etc.), top-center — its OWN label, so it
+	-- never overwrites the cash label.
+	local notifyLabel = makeLabel(gui, "NotifyLabel")
+	notifyLabel.AnchorPoint = Vector2.new(0.5, 0)
+	notifyLabel.Position = UDim2.new(0.5, 0, 0, 8)
+	notifyLabel.Size = UDim2.new(1, -20, 0, 26)
+	notifyLabel.TextSize = 16
+	notifyLabel.TextColor3 = Color3.fromRGB(255, 230, 150)
+	notifyLabel.Text = ""
+	Hud.notifyLabel = notifyLabel
+
 	Hud.buildTierList(gui, data)
 
 	gui.Parent = player:WaitForChild("PlayerGui")
@@ -161,16 +203,31 @@ function Hud.start(data: { any }): ()
 		if Hud.rebirthLabel then
 			Hud.rebirthLabel.Text = `Rebirths: {state.rebirths}  (x{state.cashMultiplier}) cash`
 		end
+		-- refresh the ladder with the actual current prices from the State payload
+		for _, entry in Hud.tierRows do
+			entry.row.Text = tierText(entry.index, entry.tier)
+		end
 	end)
 	r.CashTick.OnClientEvent:Connect(function(cash, rate)
 		if Hud.cashLabel then
 			Hud.cashLabel.Text = `$${math.floor(cash)}  (+${math.floor(rate)}/s)`
 		end
 	end)
+	local notifySeq = 0
 	r.OrbTaken.OnClientEvent:Connect(function(takerName, tierId)
-		if Hud.cashLabel then
-			Hud.cashLabel.Text = `{takerName} grabbed a brainrot orb!`
+		-- write to the separate notification label; cashLabel keeps showing cash
+		local label = Hud.notifyLabel
+		if label == nil then
+			return
 		end
+		notifySeq += 1
+		local seq = notifySeq
+		label.Text = `{takerName} grabbed a brainrot orb!`
+		task.delay(3, function()
+			if notifySeq == seq and label.Parent ~= nil then
+				label.Text = ""
+			end
+		end)
 	end)
 
 	-- ask for the initial state

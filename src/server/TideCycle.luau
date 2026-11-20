@@ -20,16 +20,19 @@ local TideCycle = {
 	orbs = {} :: { { model: Model, owner: Player, tier: number, mutation: Data.MutationId, expiresAt: number } },
 }
 
+-- The wall part is created hidden and unparented: it only becomes visible when
+-- the sweep phase sizes and parents it, so no neon 1x1x1 cube idles at the
+-- origin between cycles.
 local function makeWall(): Part
 	local wall = Instance.new("Part")
 	wall.Name = "TideWall"
 	wall.Anchored = true
 	wall.CanCollide = false
-	wall.Transparency = 0.25
+	wall.Transparency = 1
+	wall.Size = Vector3.new(0, 0, 0)
 	wall.Color = Color3.fromRGB(70, 200, 255)
 	wall.Material = Enum.Material.Neon
 	wall.Shape = Enum.PartType.Block
-	wall.Parent = workspace
 	return wall
 end
 
@@ -140,7 +143,6 @@ local function startOrbTouch(): ()
 end
 
 function TideCycle.start(): ()
-	TideCycle.wall = makeWall()
 	startOrbTouch()
 	task.spawn(function()
 		while true do
@@ -161,24 +163,36 @@ function TideCycle.start(): ()
 				Economy.remotes.TideState:FireAllClients("warning", left, TUNING.tidePeriod)
 				task.wait(0.5)
 			end
-			-- sweep: animate the wall across the reef as a shrinking ring
+			-- sweep: animate the wall across the reef as a shrinking ring; the wall
+			-- is created only now and shown immediately at full size, so nothing
+			-- sits visible at the origin during calm/warning
 			setPhase("sweep", 0)
 			local radius = 140
-			local wall = TideCycle.wall
-			if wall ~= nil then
-				wall.Shape = Enum.PartType.Cylinder
-				wall.Size = Vector3.new(radius * 2, 30, radius * 2)
+			local wall = makeWall()
+			TideCycle.wall = wall
+			wall.Shape = Enum.PartType.Cylinder
+			wall.Size = Vector3.new(radius * 2, 30, radius * 2)
+			wall.CFrame = CFrame.new(0, World.WATER_Y + 12, 0)
+			wall.Transparency = 0.25
+			wall.Parent = workspace
+			local swept = false
+			for step = 1, 30 do
+				local r = radius * (1 - step / 30)
+				wall.Size = Vector3.new(r * 2, 30, r * 2)
 				wall.CFrame = CFrame.new(0, World.WATER_Y + 12, 0)
-				for step = 1, 30 do
-					local r = radius * (1 - step / 30)
-					wall.Size = Vector3.new(r * 2, 30, r * 2)
-					wall.CFrame = CFrame.new(0, World.WATER_Y + 12, 0)
-					task.wait(0.12)
+				-- punish when the wall VISUALLY reaches the pad ring radius, not
+				-- after the whole shrink animation has finished
+				if not swept and r <= World.RING_RADIUS then
+					swept = true
+					sweep()
 				end
-				wall:Destroy()
-				TideCycle.wall = makeWall()
+				task.wait(0.12)
 			end
-			sweep()
+			wall:Destroy()
+			TideCycle.wall = nil
+			if not swept then
+				sweep() -- safety net: the ring was already inside RING_RADIUS
+			end
 		end
 	end)
 end
