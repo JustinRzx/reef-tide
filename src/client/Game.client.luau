@@ -30,11 +30,12 @@ local TIERS = {
 }
 
 local function releaseSpawn(): ()
-	-- ask the server to (re)spawn us; CharacterAutoLoads is off, so load the character now
+	-- tell the server we dismissed the title screen; the server owns character
+	-- loading — Player:LoadCharacter() can only be called on the server, calling
+	-- it here throws and leaves the player without a character (join soft-lock)
 	local remoteFolder = ReplicatedStorage:WaitForChild("Remotes", 10)
 	local state = remoteFolder:WaitForChild("State", 10) :: RemoteEvent
 	state:FireServer()
-	player:LoadCharacter()
 end
 
 CameraRig.start()

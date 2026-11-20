@@ -217,11 +217,32 @@ end
 function BasePad.start(): ()
 	Players.PlayerAdded:Connect(function(player)
 		BasePad.assign(player)
-		player.CharacterAdded:Connect(function()
+		-- CharacterAutoLoads is off, so the server must load the character itself.
+		-- Nothing client-side can do this (LoadCharacter errors in a LocalScript),
+		-- and without this the player joins with no character at all.
+		player:LoadCharacter()
+		player.CharacterAdded:Connect(function(char)
 			BasePad.spawnCharacter(player)
+			local humanoid = char:FindFirstChild("Humanoid")
+			if humanoid ~= nil and humanoid:IsA("Humanoid") then
+				humanoid.Died:Connect(function()
+					-- auto-respawn is off with CharacterAutoLoads=false: reload server-side
+					task.wait(Players.RespawnTime)
+					if player.Parent ~= nil then
+						player:LoadCharacter()
+					end
+				end)
+			end
 		end)
 		if player.Character ~= nil then
 			BasePad.spawnCharacter(player)
+		end
+	end)
+	-- the client title-screen dismiss fires State; if the character is somehow
+	-- still missing, load it now (the client cannot)
+	Economy.remotes.State.OnServerEvent:Connect(function(player)
+		if player.Character == nil then
+			player:LoadCharacter()
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)
